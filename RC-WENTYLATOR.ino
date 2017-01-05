@@ -5,6 +5,7 @@
 //*************************************************************************************************************
 /*
  CHANGELOG
+ 2017.01.05 v.1.0.7 dodana obsługa wentylatora
  2015.05.09 v.1.0.4 poprawki w komentarzach filtrowanie pomiaru napięcia 
  dodanie zmiennych wartości filtru temperatury i napięcia
  2015.04.23 v.1.0.3 pomiar napięcia, czyszczenie kodu 
@@ -15,14 +16,14 @@
 
 //konfiguracja podstawowa, zmienne można ostrożnie modyfikować
 //#define DEBUG
-#define software_version "1.0.6"
+#define software_version "1.0.7"
 const int temp_treshold = 250;                        // temperatura startu wentylatora (st C x 10)
 const int temp_max = 900;                             // temperatura przy której wentylator osiąga max obrotów
-const int led1_on = 250;
-const int led1_off = 250;
-const int led2_on = 300;
-const int led2_off = 300;
-const int buzz_on = 260;
+//const int led1_on = 250;
+//const int led1_off = 250;
+//const int led2_on = 300;
+//const int led2_off = 300;
+const int buzz_on = 270;
 const int buzz_off = 260;
 
 int pwm_min = 4;                                      // punkt startu wentylatora
@@ -40,6 +41,7 @@ const int pomiar_temp_input = A5;           //wejście pomiaru temperatury
 const int pomiar_napiecia  = A6;            //wejście pomiaru napięcia 
 const int output_pin = 3;                   //pwm output sterowanie wentylatorem
 const int lcd_led_pin = 13;                 //podświetlanie wyświetlacza
+const int buzz_drive_pin = 11;              //tutaj wpinam buzzer
 int went_drive = 0;                         //zmienna wysterowanie PWM dla wentylatora
 unsigned long time_to_draw = 0;             //
 unsigned long time_to_mesure_voltage = 0;   //
@@ -51,7 +53,7 @@ int temp_buffor = 0;                        //
 int volt_buffor = 0;                        //
 int voltage_buffor = 0;                     //
 int wysterowanie = 0;                       //
-
+boolean buzz_flag = false;                  // flaga buzerka potrzebne do modulacji
 //*************************************************************************************************************
 //podłączamy bibliotekę do obsługi wyświetlacza
 #include <LCD5110_Graph.h>
@@ -156,6 +158,7 @@ void setup(){
   pinMode(pomiar_napiecia,INPUT);                          //inicjalizacja pinu pomiaru napięcia
   pinMode(output_pin,OUTPUT);                              //inicjalizacja pinu sterowania
   pinMode(lcd_led_pin,OUTPUT);
+  pinMode(buzz_drive_pin,OUTPUT);                         //trzeba go skonfigurowac
   #ifdef DEBUG
     Serial.begin(9600);
   #endif
@@ -174,42 +177,42 @@ void setup(){
 }//end setup
 
 void loop(){
-   
-    if (temp >= led1_on){ digitalWrite(5,HIGH); }
-    if (temp < led1_off){ digitalWrite(5,LOW); }
-if (temp >= led2_on){ digitalWrite(6,HIGH); }
-    if (temp < led2_off){ digitalWrite(6,LOW); }
-
-if (temp >= buzz_on){ tone(10,4300); }
-    if (temp < buzz_off){ tone(10,LOW); }
-    
-    function_pomiar_temperatury();
-    function_pomiar_napiecia();   
+  function_pomiar_temperatury();
+  function_pomiar_napiecia();   
   #ifdef DEBUG
     temp++;
     delay(1000);  
   #endif
   update_lcd_data();
   //sterowanie wyjściem wentylatora
-      int went_min = 255 - pwm_min;                        //odwracam końce
-      int went_max = 255 - pwm_max;                        //odwracam końce
-      if(temp >= temp_treshold){
-        if(temp < temp_max){
-          went_drive =map(temp,temp_treshold,temp_max,went_min,went_max);  //sterowanie wydatkiem wentylatora 
-          went_drive = constrain(went_drive,went_max,went_min);
-          wysterowanie = constrain(map(went_drive,went_min,went_max,0,100),0,100); 
-          #ifdef DEBUG
-            Serial.println(String(temp)+","+String(wysterowanie)+ ","+String(went_drive)+","+String(pwm_min)+","+String(pwm_max));
-          #endif
-        }else{
-          went_drive = 0;
-          wysterowanie = 100;
-        }
+  int went_min = 255 - pwm_min;                        //odwracam końce
+  int went_max = 255 - pwm_max;                        //odwracam końce
+  if(temp >= temp_treshold){
+    if(temp < temp_max){
+      went_drive =map(temp,temp_treshold,temp_max,went_min,went_max);  //sterowanie wydatkiem wentylatora 
+      went_drive = constrain(went_drive,went_max,went_min);
+      wysterowanie = constrain(map(went_drive,went_min,went_max,0,100),0,100); 
+      #ifdef DEBUG
+        Serial.println(String(temp)+","+String(wysterowanie)+ ","+String(went_drive)+","+String(pwm_min)+","+String(pwm_max));
+      #endif
       }else{
-        went_drive = 255; //stop
-        wysterowanie = 0;
+        went_drive = 0;
+        wysterowanie = 100;
       }
-    analogWrite(output_pin,went_drive);                                    //sterowanie driverem wentylatora
+    }else{
+      went_drive = 255; //stop
+      wysterowanie = 0;
+    }
+  analogWrite(output_pin,went_drive);                                    //sterowanie driverem wentylatora
+  
+  //sterowanie buzerem docelowo przeniesc do osobnej funkcji
+  if (temp >= buzz_on){
+    digitalWrite(buzz_drive_pin,HIGH);    
+  }else if(temp < buzz_off){
+    digitalWrite(buzz_drive_pin,LOW); 
+  }
+  
+    
 }//end loop
 
 //EOF
